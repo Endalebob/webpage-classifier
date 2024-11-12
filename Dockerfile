@@ -8,10 +8,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright and only the Chromium browser
-RUN pip install playwright && playwright install chromium
+# Install Playwright and both Chromium and Firefox browsers
+RUN pip install playwright && playwright install chromium firefox
 
-# Install required libraries for Chromium to run in headless mode
+# Install required libraries for Chromium and Firefox to run in headless mode
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     libnss3 \
@@ -39,6 +39,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxtst6 \
     fonts-liberation \
     fonts-noto-color-emoji \
+    libfontconfig1 \
+    libfreetype6 \
+    libxrender1 \
+    libxinerama1 \
+    libx11-xcb1 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy the application code
@@ -47,5 +52,5 @@ COPY . .
 # Expose the port that FastAPI will run on
 EXPOSE 8001
 
-# Run FastAPI app using Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Run FastAPI app using Uvicorn with multiple workers
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]

@@ -53,12 +53,25 @@ async def generate_api_key(rate_limit: Optional[int] = None, master_key: str = D
     - **rate_limit**: Optional. The maximum number of requests allowed for this key.
     - **master_key**: Required. The master key to authorize API key generation.
 
-    Returns:
-        - **api_key**: The generated API key.
-        - **created_at**: The timestamp when the key was created.
-        - **status**: The current status of the API key (active or revoked).
-        - **rate_limit**: The rate limit for this key, if set.
-        - **usage_count**: Number of times this key has been used (initially 0).
+    ### Example Request
+    ```python
+    response = requests.post(
+        "http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/generate",
+        params={"key": "your_master_key"},
+        json={"rate_limit": 100}
+    )
+    ```
+
+    ### Example Response
+    ```json
+    {
+      "api_key": "e4b27e89-08c3-4a68-9d3f-4adfe8c8b812",
+      "created_at": "2024-11-05T10:12:45.472Z",
+      "status": "active",
+      "rate_limit": 100,
+      "usage_count": 0
+    }
+    ```
     """
     new_key = str(uuid.uuid4())
     api_key_data = APIKey(api_key=new_key, created_at=datetime.utcnow(), rate_limit=rate_limit)
@@ -75,7 +88,19 @@ async def revoke_api_key(api_key: str, master_key: str = Depends(verify_master_k
     - **api_key**: The API key to revoke.
     - **master_key**: Required. The master key to authorize revocation.
 
-    Returns a message indicating whether the key was successfully revoked or not found.
+    ### Example Request
+    ```python
+    response = requests.delete(
+    "http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys/{api_key}",
+    params={"key": "your_master_key"})
+    ```
+
+    ### Example Response
+    ```json
+    {
+      "message": "API key revoked successfully"
+    }
+    ```
     """
     result = api_keys_collection.update_one({"api_key": api_key, "status": "active"}, {"$set": {"status": "revoked"}})
     if result.matched_count == 0:
@@ -91,7 +116,24 @@ async def list_api_keys(master_key: str = Depends(verify_master_key)):
 
     - **master_key**: Required. The master key to authorize listing.
 
-    Returns a list of API keys and their details.
+    ### Example Request
+    ```python
+    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys", params={"key": "your_master_key"})
+    ```
+
+    ### Example Response
+    ```json
+    [
+      {
+        "api_key": "e4b27e89-08c3-4a68-9d3f-4adfe8c8b812",
+        "created_at": "2024-11-05T10:12:45.472Z",
+        "status": "active",
+        "rate_limit": 100,
+        "usage_count": 0
+      },
+      ...
+    ]
+    ```
     """
     api_keys = list(api_keys_collection.find({}, {"_id": 0}))
     return api_keys
@@ -106,7 +148,21 @@ async def refresh_api_key(api_key: str, master_key: str = Depends(verify_master_
     - **api_key**: The API key to refresh.
     - **master_key**: Required. The master key to authorize refreshing.
 
-    Returns the updated API key with usage_count reset to zero.
+    ### Example Request
+    ```python
+    response = requests.put("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys/{api_key}/refresh", params={"key": "your_master_key"})
+    ```
+
+    ### Example Response
+    ```json
+    {
+      "api_key": "e4b27e89-08c3-4a68-9d3f-4adfe8c8b812",
+      "created_at": "2024-11-05T10:12:45.472Z",
+      "status": "active",
+      "rate_limit": 100,
+      "usage_count": 0
+    }
+    ```
     """
     existing_key = api_keys_collection.find_one({"api_key": api_key, "status": "active"})
     if not existing_key:
@@ -131,10 +187,19 @@ async def classify_url(url: str, api_key: str):
     - **url**: The URL to classify.
     - **api_key**: An active API key for authorization.
 
-    Returns:
-        - **url**: The requested URL.
-        - **classification**: The classification result (e.g., "live website").
-        - **source**: Indicates whether the result was retrieved from the cache or newly processed.
+    ### Example Request
+    ```python
+    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/classify-url", params={"url": "example.com", "api_key": "your_api_key"})
+    ```
+
+    ### Example Response
+    ```json
+    {
+      "url": "example.com",
+      "classification": "live website",
+      "source": "processed"
+    }
+    ```
     """
     api_key_data = api_keys_collection.find_one({"api_key": api_key, "status": "active"})
     if not api_key_data:
@@ -162,6 +227,36 @@ async def classify_url(url: str, api_key: str):
     api_keys_collection.update_one({"api_key": api_key}, {"$inc": {"usage_count": 1}})
 
     return {"url": url, "classification": result, "source": "processed"}
+
+
+# New Poll Classification Endpoint
+@app.get("/poll-classification", summary="Poll classification result for a URL")
+async def poll_classification(url: str):
+    """
+    Poll the classification result of a previously classified URL.
+
+    - **url**: The URL to poll for its classification result.
+
+    ### Example Request
+    ```python
+    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/poll-classification", params={"url": "example.com"})
+    ```
+
+    ### Example Response
+    ```json
+    {
+      "url": "example.com",
+      "classification": "live website",
+      "timestamp": "2024-11-05T10:12:45.472Z"
+    }
+    ```
+    """
+    existing_entry = classified_urls_collection.find_one({"url": url},
+                                                         {"_id": 0, "url": 1, "classification": 1, "timestamp": 1})
+    if not existing_entry:
+        raise HTTPException(status_code=404, detail="Classification result not found for the given URL")
+
+    return existing_entry
 
 
 '''

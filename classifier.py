@@ -14,12 +14,12 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-MAX_RETRIES = 3  # Maximum number of retry attempts
+MAX_RETRIES = 2  # Maximum number of retry attempts
 
 def format_url(url):
     """Ensure the URL starts with http:// or https://"""
     if not url.startswith(('http://', 'https://')):
-        return 'https://' + url  # Default to http if no protocol is provided
+        return 'http://' + url  # Default to http if no protocol is provided
     return url
 
 async def load_and_screenshot(url, retries=MAX_RETRIES):
@@ -31,9 +31,10 @@ async def load_and_screenshot(url, retries=MAX_RETRIES):
     for attempt in range(1, retries + 1):
         try:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
-                page = await browser.new_page()
-                await page.goto(url, timeout=80000)
+                browser = await p.firefox.launch(headless=True)  # Use Firefox instead of Chromium
+                page = await browser.new_page(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Gecko/20100101 Firefox/89.0")
+                await page.goto(url, timeout=30000)
                 await page.screenshot(path=image_path)
                 await browser.close()
 
@@ -49,18 +50,57 @@ async def load_and_screenshot(url, retries=MAX_RETRIES):
                 return None  # Return None if all retries fail
             await asyncio.sleep(1)  # Short delay before retrying
 
+
+async def gpt_classification_without_image(url):
+    print(f"Classifying without image for URL: {url}")
+
+    prompt = f"""
+Please classify the following webpage URL is provided. Determine if it is a generic parked landing page, a live website with a real business, or a nonactive domain:
+
+URL: {url}
+
+Please only give a single answer such as:
+generic parked landing page
+live website
+nonactive domain
+"""
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=50
+        )
+
+        result = response['choices'][0]['message']['content'].strip()
+        return result
+    except Exception as e:
+        print(f"Failed to classify {url} without image: {e}")
+        return "classification failure"  # Return failure on error
+
+
 async def gpt_classification(url):
     print(url)
     img_base64 = await load_and_screenshot(url)
     if img_base64 is None:
-        return "classification failure"  # Indicate failure if screenshot failed
+        return await gpt_classification_without_image(url)
 
     img_str = f"data:image/jpeg;base64,{img_base64}"
-    prompt = """Please tell me if this webpage is a generic parked landing page, a live website with a real business, a nonactive domain. Some websites may have certain graphics on it blocking you from using the website because the website owner has locked down the account, this would be generic parked landing page, make sure you analyze the text of any popups or overlays to determine if the site is parked or is a live website. Please only give me a single answer such as:
-
+    prompt = f"""
+    Please classify the webpage based on the provided screenshot. Choose only one of the following options: 
+    
     generic parked landing page
     live website
     nonactive domain
+
+    Only return one of these options without additional commentary or explanation. Do not respond with anything other than these exact terms.
+    URL: {url}
+    Screenshot: (provided as image data)
     """
 
     try:
@@ -78,7 +118,10 @@ async def gpt_classification(url):
             max_tokens=50
         )
 
-        result = response['choices'][0]['message']['content'].strip()
+        result = response['choices'][0]['message']['content'].strip().lower()
+        # Ensure the output is one of the three expected options, default to "nonactive domain" if not
+        if result not in ["generic parked landing page", "live website", "nonactive domain"]:
+            result = "nonactive domain"
         return result
     except Exception as e:
         print(f"Failed to classify {url}: {e}")
