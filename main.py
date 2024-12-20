@@ -56,7 +56,7 @@ async def generate_api_key(rate_limit: Optional[int] = None, master_key: str = D
     ### Example Request
     ```python
     response = requests.post(
-        "http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/generate",
+        "https://webpage-classifier.csa.competera.com/generate",
         params={"key": "your_master_key"},
         json={"rate_limit": 100}
     )
@@ -91,7 +91,7 @@ async def revoke_api_key(api_key: str, master_key: str = Depends(verify_master_k
     ### Example Request
     ```python
     response = requests.delete(
-    "http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys/{api_key}",
+    "https://webpage-classifier.csa.competera.com/api-keys/{api_key}",
     params={"key": "your_master_key"})
     ```
 
@@ -118,7 +118,7 @@ async def list_api_keys(master_key: str = Depends(verify_master_key)):
 
     ### Example Request
     ```python
-    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys", params={"key": "your_master_key"})
+    response = requests.get("https://webpage-classifier.csa.competera.com/api-keys", params={"key": "your_master_key"})
     ```
 
     ### Example Response
@@ -150,7 +150,7 @@ async def refresh_api_key(api_key: str, master_key: str = Depends(verify_master_
 
     ### Example Request
     ```python
-    response = requests.put("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/api-keys/{api_key}/refresh", params={"key": "your_master_key"})
+    response = requests.put("https://webpage-classifier.csa.competera.com/api-keys/{api_key}/refresh", params={"key": "your_master_key"})
     ```
 
     ### Example Response
@@ -189,7 +189,7 @@ async def classify_url(url: str, api_key: str):
 
     ### Example Request
     ```python
-    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/classify-url", params={"url": "example.com", "api_key": "your_api_key"})
+    response = requests.get("https://webpage-classifier.csa.competera.com/classify-url", params={"url": "example.com", "api_key": "your_api_key"})
     ```
 
     ### Example Response
@@ -239,7 +239,7 @@ async def poll_classification(url: str):
 
     ### Example Request
     ```python
-    response = requests.get("http://fastapi-classifier-1293371912.eu-north-1.elb.amazonaws.com:8001/poll-classification", params={"url": "example.com"})
+    response = requests.get("https://webpage-classifier.csa.competera.com/poll-classification", params={"url": "example.com"})
     ```
 
     ### Example Response
