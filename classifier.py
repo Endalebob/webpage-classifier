@@ -125,4 +125,4 @@ async def gpt_classification(url):
         return result
     except Exception as e:
         print(f"Failed to classify {url}: {e}")
-        return "classification failure"  # Return failure on error
+        return "classification failure"

@@ -8,7 +8,7 @@ from typing import Optional, List
 from dotenv import load_dotenv
 from classifier import gpt_classification
 
-# Load environment variables
+# Load environment vars
 load_dotenv()
 
 # Initialize FastAPI and MongoDB client
